@@ -122,19 +122,3 @@ python app.py
 
 ### 5. Open the frontend
 Open `frontend/index.html` in your browser, or serve the frontend with a local server.
-
-## Screenshots
-
-Add screenshots here after you capture the UI.
-
-## Future Improvements
-
-- Better receipt parsing for more store formats
-- Real-time reminders through notifications
-- Inventory tracking beyond receipts
-- Mobile-friendly dashboard improvements
-- Cloud deployment for frontend and backend
-
-## License
-
-This project is open source for learning and personal use.
