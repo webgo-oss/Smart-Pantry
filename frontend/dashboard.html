@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <!-- <link rel="stylesheet" href="style.css" /> -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -402,14 +402,31 @@
       margin-bottom: 0 !important;
     }
 
-    /* ── INLINE LOADER (inside #dashboard) ── */
+    /* ─── ITEMS PANEL / INLINE LOADER ─── */
+    .items-panel-body {
+      position: relative;
+      min-height: 240px;
+    }
+
+    #dashboard {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
     #inline-loader {
       display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 2;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 24px 16px 20px;
       gap: 10px;
+      padding: 24px 16px 20px;
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(1px);
     }
     #inline-loader.active { display: flex; }
     #loader-canvas {
@@ -520,7 +537,7 @@
 
     <!-- Upload -->
     <div class="upload-strip">
-      <div class="upload-icon">🧾</div>
+      <div class="upload-icon"><i class="bi bi-receipt"></i></div>
       <div class="upload-copy">
         <h2>Add a Receipt</h2>
         <p>Snap or upload a grocery receipt — we'll extract the items automatically.</p>
@@ -558,14 +575,18 @@
           <h3>Items Found</h3>
           <span class="panel-tag">Items</span>
         </div>
-        <div id="dashboard">
+
+        <div class="items-panel-body">
           <div id="inline-loader">
             <canvas id="loader-canvas" width="400" height="300"></canvas>
             <div class="loader-text">Scanning your receipt…</div>
           </div>
-          <div class="empty-state">
-            <div class="e-icon">🥬</div>
-            <p>No items yet — upload a receipt above.</p>
+
+          <div id="dashboard">
+            <div class="empty-state">
+              <div class="e-icon">🥬</div>
+              <p>No items yet — upload a receipt above.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -661,13 +682,16 @@
 
   window.showLoader = function() {
     const loader = document.getElementById('inline-loader');
+    if (!loader) return;
     loader.classList.add('active');
     currentFrame = 0;
+    clearTimeout(animTimer);
     drawFrame();
   };
 
   window.hideLoader = function() {
     const loader = document.getElementById('inline-loader');
+    if (!loader) return;
     loader.classList.remove('active');
     clearTimeout(animTimer);
     ctx.clearRect(0, 0, 400, 300);
@@ -677,60 +701,30 @@
 
 
 <script>
-// Patch uploadReceipt to use our overlay instead of inline text
+// Keep the loader independent from dashboard.innerHTML writes.
+// This lets script.js render item cards normally without the animation getting stuck.
 (function() {
-  const _orig = window.uploadReceipt;
-  // We override after script.js loads
   window.addEventListener('load', function() {
     const origFn = window.uploadReceipt;
+    if (typeof origFn !== 'function') return;
+
     window.uploadReceipt = async function() {
       const input = document.getElementById('receiptInput');
-      if (!input.files.length) { alert('Please select a receipt image.'); return; }
+      if (!input.files.length) {
+        alert('Please select a receipt image.');
+        return;
+      }
 
-      const dashboard = document.getElementById('dashboard');
-      const loader = document.getElementById('inline-loader');
-
-      // Show our animation first
-      Array.from(dashboard.children).forEach(ch => { if (ch.id !== 'inline-loader') ch.remove(); });
       window.showLoader();
-
-      // Intercept innerHTML writes on dashboard while loading:
-      // script.js does dashboard.innerHTML = "Processing receipt..." which kills our canvas.
-      // We block that one write but allow the final results write through.
-      let blocked = true;
-      const proto = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
-      Object.defineProperty(dashboard, 'innerHTML', {
-        set(val) {
-          if (blocked) {
-            // Drop the "Processing receipt..." write — keep our animation alive
-            return;
-          }
-          // After we unblock, restore normal behaviour and write results
-          Object.defineProperty(dashboard, 'innerHTML', proto);
-          // Re-attach loader (hidden) so it stays in DOM
-          proto.set.call(dashboard, val);
-          dashboard.insertBefore(loader, dashboard.firstChild);
-        },
-        get() { return proto.get.call(dashboard); },
-        configurable: true
-      });
 
       try {
         await origFn();
       } finally {
-        blocked = false;
         window.hideLoader();
-        // If innerHTML was never written (error path), restore property
-        const desc = Object.getOwnPropertyDescriptor(dashboard, 'innerHTML');
-        if (desc && desc.set !== proto.set) {
-          Object.defineProperty(dashboard, 'innerHTML', proto);
-          dashboard.insertBefore(loader, dashboard.firstChild);
-        }
       }
     };
   });
 })();
-
 </script>
 <script>
 // Custom confirm/alert modal — replaces native confirm()/alert()
